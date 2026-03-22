@@ -1,0 +1,26 @@
+[
+  {
+    "id": "store_blood_records",
+    "name": "Blood Records",
+    "region": "UK",
+    "isFollowed": true
+  },
+  {
+    "id": "store_bad_world",
+    "name": "bad world",
+    "region": "UK",
+    "isFollowed": true
+  },
+  {
+    "id": "store_banquet_records",
+    "name": "Banquet Records",
+    "region": "UK",
+    "isFollowed": true
+  },
+  {
+    "id": "store_rough_trade_us",
+    "name": "Rough Trade US",
+    "region": "US",
+    "isFollowed": false
+  }
+]

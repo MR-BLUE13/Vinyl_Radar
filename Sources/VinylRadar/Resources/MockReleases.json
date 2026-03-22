@@ -1,0 +1,90 @@
+[
+  {
+    "id": "r1",
+    "artist": "The Metropolitan Analog Preservation Ensemble featuring Armand de la Cote",
+    "title": "Afterlight Sessions",
+    "coverAssetName": "cover_01",
+    "storeID": "store_blood_records",
+    "publishedAt": "2026-03-19T14:55:00Z",
+    "flags": ["NEW"],
+    "sourceItemURL": "https://blood-records.co.uk/collections/drops",
+    "sourceItemKey": "blood_records_r1"
+  },
+  {
+    "id": "r2",
+    "artist": "Hollow Loom",
+    "title": "Fragments for a Quiet City at Dawn (Collector's Archive Pressing Vol. II)",
+    "coverAssetName": "cover_02",
+    "storeID": "store_bad_world",
+    "publishedAt": "2026-03-19T14:40:00Z",
+    "flags": ["NEW", "LIMITED", "COLORED"],
+    "sourceItemURL": "https://bad-world.co.uk",
+    "sourceItemKey": "bad_world_r2"
+  },
+  {
+    "id": "r3",
+    "artist": "Velvet Transfer",
+    "title": "Nocturne in Signal",
+    "coverAssetName": "cover_03",
+    "storeID": "store_banquet_records",
+    "publishedAt": "2026-03-19T14:30:00Z",
+    "flags": ["EXCLUSIVE"],
+    "sourceItemURL": "https://www.banquetrecords.com/pre-orders",
+    "sourceItemKey": "banquet_records_r3"
+  },
+  {
+    "id": "r4",
+    "artist": "Polaris Run",
+    "title": "Current Memory",
+    "coverAssetName": "cover_04",
+    "storeID": "store_blood_records",
+    "publishedAt": "2026-03-19T12:45:00Z",
+    "flags": ["LIMITED"],
+    "sourceItemURL": "https://blood-records.co.uk/collections/drops",
+    "sourceItemKey": "blood_records_r4"
+  },
+  {
+    "id": "r5",
+    "artist": "Mira Vale",
+    "title": "Reel Bloom",
+    "coverAssetName": "cover_05",
+    "storeID": "store_bad_world",
+    "publishedAt": "2026-03-18T21:00:00Z",
+    "flags": ["COLORED"],
+    "sourceItemURL": "https://bad-world.co.uk",
+    "sourceItemKey": "bad_world_r5"
+  },
+  {
+    "id": "r6",
+    "artist": "North Relay",
+    "title": "Night Transit",
+    "coverAssetName": "cover_06",
+    "storeID": "store_banquet_records",
+    "publishedAt": "2026-03-19T14:48:00Z",
+    "flags": ["NEW", "EXCLUSIVE"],
+    "sourceItemURL": "https://www.banquetrecords.com/pre-orders",
+    "sourceItemKey": "banquet_records_r6"
+  },
+  {
+    "id": "r7",
+    "artist": "Static Harbor",
+    "title": "Contour Waves",
+    "coverAssetName": "cover_07",
+    "storeID": "store_blood_records",
+    "publishedAt": "2026-03-19T10:10:00Z",
+    "flags": ["LIMITED", "COLORED"],
+    "sourceItemURL": "https://blood-records.co.uk/collections/drops",
+    "sourceItemKey": "blood_records_r7"
+  },
+  {
+    "id": "r8",
+    "artist": "Haze Unit",
+    "title": "Cold Channel",
+    "coverAssetName": "cover_08",
+    "storeID": "store_bad_world",
+    "publishedAt": "2026-03-17T10:10:00Z",
+    "flags": [],
+    "sourceItemURL": "https://bad-world.co.uk",
+    "sourceItemKey": "bad_world_r8"
+  }
+]
