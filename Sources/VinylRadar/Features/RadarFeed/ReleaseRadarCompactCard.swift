@@ -13,6 +13,13 @@ struct ReleaseRadarCompactCard: View {
         max(0, item.badges.count - visibleBadges.count)
     }
 
+    private var metaText: String {
+        if item.isSoldOut {
+            return "\(item.sourceName) · 已售罄"
+        }
+        return item.sourceName
+    }
+
     var body: some View {
         ZStack(alignment: .topTrailing) {
             Button(action: onTap) {
@@ -35,7 +42,7 @@ struct ReleaseRadarCompactCard: View {
                             .foregroundStyle(RadarColor.textPrimary.opacity(0.92))
                             .lineLimit(2)
 
-                        Text("\(item.sourceName) · \(item.publishedAtText)")
+                        Text(metaText)
                             .font(RadarTypography.meta)
                             .foregroundStyle(RadarColor.textSecondary)
                             .lineLimit(1)
@@ -56,7 +63,6 @@ struct ReleaseRadarCompactCard: View {
                     Spacer(minLength: 0)
                 }
                 .padding(RadarSpacing.sm)
-                .frame(maxWidth: .infinity)
                 .background(
                     RoundedRectangle(cornerRadius: RadarRadius.card, style: .continuous)
                         .fill(RadarColor.surfaceCard.opacity(0.88))
@@ -66,6 +72,7 @@ struct ReleaseRadarCompactCard: View {
                         .stroke(Color.white.opacity(0.07), lineWidth: 1)
                 )
                 .shadow(color: Color.black.opacity(0.18), radius: 8, x: 0, y: 6)
+                .clipped()
             }
             .buttonStyle(.plain)
             .accessibilityIdentifier("release_compact_card_\(item.id)")

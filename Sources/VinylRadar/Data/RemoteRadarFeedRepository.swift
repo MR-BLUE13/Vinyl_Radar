@@ -17,7 +17,7 @@ public actor RemoteRadarFeedRepository: RadarFeedRepository {
     public init(
         baseURL: URL,
         endpointPath: String = "/v1/radar/releases",
-        timeoutInterval: TimeInterval = 6,
+        timeoutInterval: TimeInterval = 12,
         cacheStore: any RadarFeedCacheStore = UserDefaultsRadarFeedCacheStore(),
         fetcher: @escaping Fetcher = RemoteRadarFeedRepository.defaultFetcher
     ) throws {
@@ -31,33 +31,57 @@ public actor RemoteRadarFeedRepository: RadarFeedRepository {
         self.fetcher = fetcher
     }
 
-    public func fetchLatest() async throws -> [ReleaseDrop] {
+    public func fetchLatest(forceRefresh: Bool = false) async throws -> [ReleaseDrop] {
         do {
-            var request = URLRequest(url: endpoint)
-            request.timeoutInterval = timeoutInterval
-            request.setValue("application/json", forHTTPHeaderField: "Accept")
-            request.cachePolicy = .reloadIgnoringLocalCacheData
-
-            let (data, response) = try await fetcher(request)
-            guard let httpResponse = response as? HTTPURLResponse else {
-                throw RepositoryError.invalidResponse
-            }
-            guard (200..<300).contains(httpResponse.statusCode) else {
-                throw RepositoryError.unexpectedStatusCode(httpResponse.statusCode)
-            }
-
-            let decoder = JSONDecoder()
-            decoder.dateDecodingStrategy = .iso8601
-            let snapshot = try decoder.decode(RadarReleasesSnapshot.self, from: data)
-
-            await cacheStore.save(snapshot.releases)
-            return snapshot.releases
+            return try await fetchSnapshot(forceRefresh: forceRefresh)
         } catch {
+            if forceRefresh {
+                do {
+                    return try await fetchSnapshot(forceRefresh: false)
+                } catch {
+                    // Fall through to cache fallback.
+                }
+            }
             if let cached = await cacheStore.load(), !cached.isEmpty {
                 return cached
             }
             throw error
         }
+    }
+
+    private func fetchSnapshot(forceRefresh: Bool) async throws -> [ReleaseDrop] {
+        var request = URLRequest(url: endpointURL(forceRefresh: forceRefresh))
+        request.timeoutInterval = timeoutInterval
+        request.setValue("application/json", forHTTPHeaderField: "Accept")
+        request.cachePolicy = .reloadIgnoringLocalCacheData
+
+        let (data, response) = try await fetcher(request)
+        guard let httpResponse = response as? HTTPURLResponse else {
+            throw RepositoryError.invalidResponse
+        }
+        guard (200..<300).contains(httpResponse.statusCode) else {
+            throw RepositoryError.unexpectedStatusCode(httpResponse.statusCode)
+        }
+
+        let decoder = JSONDecoder()
+        decoder.dateDecodingStrategy = .iso8601
+        let snapshot = try decoder.decode(RadarReleasesSnapshot.self, from: data)
+
+        await cacheStore.save(snapshot.releases)
+        return snapshot.releases
+    }
+
+    private func endpointURL(forceRefresh: Bool) -> URL {
+        guard forceRefresh,
+              var components = URLComponents(url: endpoint, resolvingAgainstBaseURL: false) else {
+            return endpoint
+        }
+
+        var queryItems = components.queryItems ?? []
+        queryItems.removeAll(where: { $0.name == "refresh" })
+        queryItems.append(URLQueryItem(name: "refresh", value: "1"))
+        components.queryItems = queryItems
+        return components.url ?? endpoint
     }
 }
 

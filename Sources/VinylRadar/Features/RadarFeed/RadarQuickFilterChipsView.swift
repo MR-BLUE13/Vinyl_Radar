@@ -33,6 +33,8 @@ struct RadarQuickFilterChipsView: View {
             }
             .padding(.vertical, 2)
         }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .clipped()
     }
 }
 

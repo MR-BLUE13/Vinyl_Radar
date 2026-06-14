@@ -33,6 +33,19 @@ public enum FeedFlagClassifier {
             flags.insert(.isExclusive)
         }
 
+        if Self.containsAny(normalized.replacingOccurrences(of: "unsigned", with: ""), keywords: [
+            "signed",
+            "personally signed",
+            "autographed",
+            "hand-signed",
+            "signature",
+            "signed print",
+            "签名",
+            "亲签",
+        ]) {
+            flags.insert(.isSigned)
+        }
+
         if now.timeIntervalSince(firstSeenAt) <= 72 * 60 * 60 {
             flags.insert(.isNew)
         }

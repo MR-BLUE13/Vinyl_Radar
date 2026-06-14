@@ -189,7 +189,7 @@
 			buildSettings = {
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
-				DEVELOPMENT_TEAM = "";
+				DEVELOPMENT_TEAM = 99WCAL9A5W;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = VinylRadarDemo/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (
@@ -211,7 +211,7 @@
 			buildSettings = {
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
-				DEVELOPMENT_TEAM = "";
+				DEVELOPMENT_TEAM = 99WCAL9A5W;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = VinylRadarDemo/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (

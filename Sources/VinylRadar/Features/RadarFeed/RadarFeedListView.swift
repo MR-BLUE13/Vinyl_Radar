@@ -25,6 +25,7 @@ struct RadarFeedListView: View {
                 }
             }
         }
+        .frame(maxWidth: .infinity, alignment: .leading)
         .animation(.easeInOut(duration: 0.18), value: layout)
     }
 }

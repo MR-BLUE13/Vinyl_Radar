@@ -30,8 +30,11 @@ class RawRelease:
     title: str
     source_item_url: str
     cover_image_url: Optional[str]
+    description: Optional[str] = None
+    is_sold_out: bool = False
     published_at: Optional[datetime] = None
     subtitle: Optional[str] = None
+    signed_by_heuristic: bool = False
 
 
 @dataclass(frozen=True)
@@ -44,7 +47,11 @@ class Release:
     sourceItemKey: str
     storeID: str
     publishedAt: datetime
+    publishedAtSource: str
     flags: List[str]
+    description: Optional[str] = None
+    isSoldOut: bool = False
+    signedByHeuristic: bool = False
 
     def to_dict(self) -> dict:
         return {
@@ -56,7 +63,11 @@ class Release:
             "sourceItemKey": self.sourceItemKey,
             "storeID": self.storeID,
             "publishedAt": to_iso8601(self.publishedAt),
+            "publishedAtSource": self.publishedAtSource,
             "flags": self.flags,
+            "description": self.description,
+            "isSoldOut": self.isSoldOut,
+            "signedByHeuristic": self.signedByHeuristic,
         }
 
     @staticmethod
@@ -70,7 +81,13 @@ class Release:
             sourceItemKey=payload["sourceItemKey"],
             storeID=payload["storeID"],
             publishedAt=parse_iso8601(payload["publishedAt"]),
+            # Legacy snapshots don't carry source semantics; default to first_seen to avoid
+            # presenting inferred time as canonical release time.
+            publishedAtSource=payload.get("publishedAtSource", "first_seen"),
             flags=list(payload.get("flags", [])),
+            description=payload.get("description"),
+            isSoldOut=bool(payload.get("isSoldOut", False)),
+            signedByHeuristic=bool(payload.get("signedByHeuristic", False)),
         )
 
 

@@ -10,7 +10,11 @@ public struct ReleaseDrop: Identifiable, Codable, Equatable, Hashable, Sendable 
     public let sourceItemKey: String
     public let storeID: String
     public let publishedAt: Date
+    public let publishedAtSource: PublishedAtSource
     public let flags: ReleaseFlags
+    public let description: String?
+    public let isSoldOut: Bool
+    public let signedByHeuristic: Bool
 
     public init(
         id: String,
@@ -19,10 +23,14 @@ public struct ReleaseDrop: Identifiable, Codable, Equatable, Hashable, Sendable 
         coverAssetName: String? = nil,
         storeID: String,
         publishedAt: Date,
+        publishedAtSource: PublishedAtSource = .source,
         flags: ReleaseFlags,
         coverImageURL: URL? = nil,
         sourceItemURL: URL? = nil,
-        sourceItemKey: String? = nil
+        sourceItemKey: String? = nil,
+        description: String? = nil,
+        isSoldOut: Bool = false,
+        signedByHeuristic: Bool = false
     ) {
         self.id = id
         self.artist = artist
@@ -33,7 +41,11 @@ public struct ReleaseDrop: Identifiable, Codable, Equatable, Hashable, Sendable 
         self.sourceItemKey = sourceItemKey ?? id
         self.storeID = storeID
         self.publishedAt = publishedAt
+        self.publishedAtSource = publishedAtSource
         self.flags = flags
+        self.description = description
+        self.isSoldOut = isSoldOut
+        self.signedByHeuristic = signedByHeuristic
     }
 
     enum CodingKeys: String, CodingKey {
@@ -46,7 +58,11 @@ public struct ReleaseDrop: Identifiable, Codable, Equatable, Hashable, Sendable 
         case sourceItemKey
         case storeID
         case publishedAt
+        case publishedAtSource
         case flags
+        case description
+        case isSoldOut
+        case signedByHeuristic
     }
 
     public init(from decoder: Decoder) throws {
@@ -61,7 +77,11 @@ public struct ReleaseDrop: Identifiable, Codable, Equatable, Hashable, Sendable 
         sourceItemKey = try container.decodeIfPresent(String.self, forKey: .sourceItemKey) ?? id
         storeID = try container.decode(String.self, forKey: .storeID)
         publishedAt = try container.decode(Date.self, forKey: .publishedAt)
+        publishedAtSource = try container.decodeIfPresent(PublishedAtSource.self, forKey: .publishedAtSource) ?? .unknown
         flags = try container.decode(ReleaseFlags.self, forKey: .flags)
+        description = try container.decodeIfPresent(String.self, forKey: .description)
+        isSoldOut = try container.decodeIfPresent(Bool.self, forKey: .isSoldOut) ?? false
+        signedByHeuristic = try container.decodeIfPresent(Bool.self, forKey: .signedByHeuristic) ?? false
     }
 
     public func encode(to encoder: Encoder) throws {
@@ -76,6 +96,10 @@ public struct ReleaseDrop: Identifiable, Codable, Equatable, Hashable, Sendable 
         try container.encode(sourceItemKey, forKey: .sourceItemKey)
         try container.encode(storeID, forKey: .storeID)
         try container.encode(publishedAt, forKey: .publishedAt)
+        try container.encode(publishedAtSource, forKey: .publishedAtSource)
         try container.encode(flags, forKey: .flags)
+        try container.encodeIfPresent(description, forKey: .description)
+        try container.encode(isSoldOut, forKey: .isSoldOut)
+        try container.encode(signedByHeuristic, forKey: .signedByHeuristic)
     }
 }

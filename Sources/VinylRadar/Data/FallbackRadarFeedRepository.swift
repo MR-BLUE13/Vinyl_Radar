@@ -9,15 +9,11 @@ public actor FallbackRadarFeedRepository: RadarFeedRepository {
         self.fallback = fallback
     }
 
-    public func fetchLatest() async throws -> [ReleaseDrop] {
+    public func fetchLatest(forceRefresh: Bool = false) async throws -> [ReleaseDrop] {
         do {
-            let primaryResult = try await primary.fetchLatest()
-            if primaryResult.isEmpty {
-                return try await fallback.fetchLatest()
-            }
-            return primaryResult
+            return try await primary.fetchLatest(forceRefresh: forceRefresh)
         } catch {
-            return try await fallback.fetchLatest()
+            return try await fallback.fetchLatest(forceRefresh: forceRefresh)
         }
     }
 }

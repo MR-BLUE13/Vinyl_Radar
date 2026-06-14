@@ -7,6 +7,9 @@ public struct RadarFeedView: View {
     @State private var activeSheet: FeedPlaceholderSheet?
     @State private var toastMessage: String?
     @State private var summaryAutoHideTask: Task<Void, Never>?
+    @State private var lastForcedRefreshAt: Date?
+
+    private let forceRefreshThrottle: TimeInterval = 45
 
     public init(viewModel: RadarFeedViewModel) {
         self.viewModel = viewModel
@@ -14,44 +17,50 @@ public struct RadarFeedView: View {
 
     public var body: some View {
         NavigationStack {
-            ScrollView {
-                VStack(alignment: .leading, spacing: RadarSpacing.lg) {
-                    scrollOffsetReader
+            GeometryReader { proxy in
+                ScrollView {
+                    VStack(alignment: .leading, spacing: RadarSpacing.lg) {
+                        scrollOffsetReader
 
-                    RadarHeaderView(
-                        cardLayout: viewModel.cardLayout,
-                        onSearchTap: { activeSheet = .search },
-                        onToggleLayoutTap: {
-                            withAnimation(.easeInOut(duration: 0.18)) {
-                                viewModel.toggleCardLayout()
+                        RadarHeaderView(
+                            cardLayout: viewModel.cardLayout,
+                            onSearchTap: { activeSheet = .search },
+                            onToggleLayoutTap: {
+                                withAnimation(.easeInOut(duration: 0.18)) {
+                                    viewModel.toggleCardLayout()
+                                }
                             }
+                        )
+
+                        if let toastMessage {
+                            RadarSummaryStrip(text: toastMessage)
+                                .transition(.opacity.combined(with: .move(edge: .top)))
                         }
-                    )
 
-                    if let toastMessage {
-                        RadarSummaryStrip(text: toastMessage)
-                            .transition(.opacity.combined(with: .move(edge: .top)))
+                        RadarQuickFilterBar(
+                            selectedFilter: $viewModel.selectedQuickFilter,
+                            onStoreFilterTap: viewModel.presentStoreFilterSheet
+                        )
+
+                        content
                     }
-
-                    RadarQuickFilterBar(
-                        selectedFilter: $viewModel.selectedQuickFilter,
-                        onStoreFilterTap: viewModel.presentStoreFilterSheet
-                    )
-
-                    content
+                    .frame(width: max(proxy.size.width - RadarSpacing.md * 2, 0), alignment: .leading)
+                    .frame(maxWidth: .infinity, alignment: .center)
+                    .padding(.top, RadarSpacing.md)
+                    .padding(.bottom, 40)
                 }
-                .padding(.horizontal, RadarSpacing.md)
-                .padding(.top, RadarSpacing.md)
-                .padding(.bottom, 40)
             }
             .coordinateSpace(name: "feedScroll")
             .onPreferenceChange(FeedScrollOffsetPreferenceKey.self, perform: handleScrollOffsetChange)
             .refreshable {
-                let result = await viewModel.retry()
-                guard result.shouldShowToast else {
-                    return
+                let now = Date()
+                let shouldForceRefresh = canForceRefresh(now: now)
+                if shouldForceRefresh {
+                    lastForcedRefreshAt = now
                 }
-                showSummaryTemporarily(newFeedCount: result.newFeedCount)
+
+                let result = await viewModel.retry(forceRefresh: shouldForceRefresh)
+                handleRefreshResult(result, wasForcedRefresh: shouldForceRefresh)
             }
             .background(RadarColor.backgroundPrimary.ignoresSafeArea())
             .task {
@@ -69,6 +78,7 @@ public struct RadarFeedView: View {
                 RadarStoreFilterSheet(
                     options: viewModel.storeFilterOptions,
                     selectedStoreIDs: viewModel.selectedStoreIDs,
+                    selectedStockFilter: viewModel.selectedStockFilter,
                     onApply: viewModel.applyStoreSelection,
                     onDismiss: viewModel.dismissStoreFilterSheet
                 )
@@ -103,7 +113,7 @@ public struct RadarFeedView: View {
             .transition(.opacity.combined(with: .scale(scale: 0.98)))
         case .empty:
             RadarEmptyStateView(
-                title: "暂无雷达命中",
+                title: "暂无相关内容",
                 subtitle: "尝试切换筛选条件或清空店铺筛选"
             )
         case .error(let message):
@@ -147,10 +157,9 @@ public struct RadarFeedView: View {
         }
     }
 
-    private func showSummaryTemporarily(newFeedCount: Int) {
+    private func showSummaryTemporarily(_ message: String) {
         summaryAutoHideTask?.cancel()
 
-        let message = "\(newFeedCount) 个新发售 · \(viewModel.summaryData.followedStoreCount) 个关注店铺 · 刚刚更新"
         withAnimation(.easeInOut(duration: 0.2)) {
             toastMessage = message
         }
@@ -166,6 +175,25 @@ public struct RadarFeedView: View {
                 summaryAutoHideTask = nil
             }
         }
+    }
+
+    private func canForceRefresh(now: Date) -> Bool {
+        guard let lastForcedRefreshAt else { return true }
+        return now.timeIntervalSince(lastForcedRefreshAt) >= forceRefreshThrottle
+    }
+
+    private func handleRefreshResult(_ result: RadarRefreshResult, wasForcedRefresh _: Bool) {
+        guard result.didSucceed else {
+            showSummaryTemporarily("刷新失败，已显示本地缓存")
+            return
+        }
+
+        if result.newFeedCount > 0 {
+            showSummaryTemporarily("\(result.newFeedCount) 个新发售 · \(viewModel.summaryData.followedStoreCount) 个关注店铺 · 刚刚更新")
+            return
+        }
+
+        showSummaryTemporarily("已是最新")
     }
 }
 

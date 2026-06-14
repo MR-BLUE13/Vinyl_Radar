@@ -1,6 +1,22 @@
 import Foundation
 
 struct RadarFeedMapper {
+    private static let alwaysExclusiveStoreIDs: Set<String> = [
+        "store_blood_records",
+        "store_bad_world",
+    ]
+
+    private static let signedKeywords: [String] = [
+        "signed",
+        "personally signed",
+        "autographed",
+        "hand-signed",
+        "signature",
+        "signed print",
+        "签名",
+        "亲签",
+    ]
+
     private let relativeFormatter: RelativeTimeFormatter
 
     init(relativeFormatter: RelativeTimeFormatter = RelativeTimeFormatter()) {
@@ -16,9 +32,28 @@ struct RadarFeedMapper {
         let storeMap = Dictionary(uniqueKeysWithValues: stores.map { ($0.id, $0) })
 
         return releases
+            .filter { storeMap[$0.storeID] != nil }
             .sorted(by: Self.sortRule)
             .map { release in
                 let store = storeMap[release.storeID]
+                let relativePublishedText = relativeFormatter.string(since: release.publishedAt, reference: referenceDate)
+                let publishedText: String
+                switch release.publishedAtSource {
+                case .source:
+                    publishedText = relativePublishedText
+                case .firstSeen:
+                    publishedText = "首次发现 \(relativePublishedText)"
+                case .unknown:
+                    publishedText = "时间未知"
+                }
+
+                let signedByFlag = release.flags.contains(.isSigned)
+                let signedByText = Self.containsSignedKeyword(in: release.title) || Self.containsSignedKeyword(in: release.description)
+                let isSignedDerived = !signedByFlag && (signedByText || release.signedByHeuristic)
+                let isSigned = signedByFlag || isSignedDerived
+                let isExclusive = release.flags.contains(.isExclusive) || Self.alwaysExclusiveStoreIDs.contains(release.storeID)
+                let badges = makeBadges(flags: release.flags, isExclusive: isExclusive)
+
                 return RadarFeedItemViewData(
                     id: release.id,
                     artist: release.artist,
@@ -28,59 +63,73 @@ struct RadarFeedMapper {
                     sourceItemURL: release.sourceItemURL,
                     storeID: release.storeID,
                     sourceName: store?.name ?? "未知店铺",
-                    publishedAtText: relativeFormatter.string(since: release.publishedAt, reference: referenceDate),
+                    publishedAtText: publishedText,
                     publishedAt: release.publishedAt,
-                    badges: release.flags.badges,
-                    isSaved: wishlistStore.isSaved(id: release.id)
+                    badges: badges,
+                    publishedAtSource: release.publishedAtSource,
+                    isExclusive: isExclusive,
+                    isSigned: isSigned,
+                    isSignedDerived: isSignedDerived,
+                    isSaved: wishlistStore.isSaved(id: release.id),
+                    description: release.description,
+                    isSoldOut: release.isSoldOut
                 )
             }
     }
 
     func apply(
         quickFilter: RadarQuickFilter,
+        stockFilter: StockAvailabilityFilter,
         selectedStoreIDs: Set<String>,
         to items: [RadarFeedItemViewData]
     ) -> [RadarFeedItemViewData] {
-        let byQuickFilter: [RadarFeedItemViewData]
-        switch quickFilter {
+        let byQuickFilter = applyQuickFilter(quickFilter, to: items)
+
+        let byStockFilter: [RadarFeedItemViewData]
+        switch stockFilter {
         case .all:
-            byQuickFilter = items
-        case .limited:
-            byQuickFilter = items.filter { $0.badges.contains(.limited) }
-        case .colored:
-            byQuickFilter = items.filter { $0.badges.contains(.colored) }
-        case .exclusive:
-            byQuickFilter = items.filter { $0.badges.contains(.exclusive) }
-        case .saved:
-            byQuickFilter = items.filter { $0.isSaved }
+            byStockFilter = byQuickFilter
+        case .inStock:
+            byStockFilter = byQuickFilter.filter { !$0.isSoldOut }
         }
 
         guard !selectedStoreIDs.isEmpty else {
-            return byQuickFilter
+            return byStockFilter
         }
 
-        return byQuickFilter.filter { selectedStoreIDs.contains($0.storeID) }
+        return byStockFilter.filter { selectedStoreIDs.contains($0.storeID) }
     }
 
     func storeFilterOptions(
         from items: [RadarFeedItemViewData],
         stores: [StoreSource],
-        selectedStoreIDs: Set<String>
+        selectedStoreIDs: Set<String>,
+        quickFilter: RadarQuickFilter,
+        stockFilter: StockAvailabilityFilter
     ) -> [StoreFilterOption] {
-        let countByStore = Dictionary(grouping: items, by: \.storeID).mapValues(\.count)
+        let byQuickFilter = applyQuickFilter(quickFilter, to: items)
+        let totalCountByStore = Dictionary(grouping: byQuickFilter, by: \.storeID).mapValues(\.count)
+        let inStockCountByStore = Dictionary(
+            grouping: byQuickFilter.filter { !$0.isSoldOut },
+            by: \.storeID
+        ).mapValues(\.count)
 
         return stores
             .map { store in
-                StoreFilterOption(
+                let isStoreSelected = selectedStoreIDs.isEmpty || selectedStoreIDs.contains(store.id)
+                return StoreFilterOption(
                     id: store.id,
                     name: store.name,
-                    count: countByStore[store.id, default: 0],
-                    isSelected: selectedStoreIDs.contains(store.id)
+                    totalCount: totalCountByStore[store.id, default: 0],
+                    inStockCount: inStockCountByStore[store.id, default: 0],
+                    isSelected: isStoreSelected
                 )
             }
             .sorted { lhs, rhs in
-                if lhs.count != rhs.count {
-                    return lhs.count > rhs.count
+                let lhsCount = lhs.displayCount(for: stockFilter)
+                let rhsCount = rhs.displayCount(for: stockFilter)
+                if lhsCount != rhsCount {
+                    return lhsCount > rhsCount
                 }
                 return lhs.name.localizedCaseInsensitiveCompare(rhs.name) == .orderedAscending
             }
@@ -118,5 +167,42 @@ struct RadarFeedMapper {
         }
 
         return lhs.title.localizedCaseInsensitiveCompare(rhs.title) == .orderedAscending
+    }
+
+    private func applyQuickFilter(
+        _ quickFilter: RadarQuickFilter,
+        to items: [RadarFeedItemViewData]
+    ) -> [RadarFeedItemViewData] {
+        switch quickFilter {
+        case .all:
+            return items
+        case .exclusive:
+            return items.filter { $0.isExclusive }
+        case .signed:
+            return items.filter { $0.isSigned }
+        case .saved:
+            return items.filter { $0.isSaved }
+        }
+    }
+
+    private func makeBadges(flags: ReleaseFlags, isExclusive: Bool) -> [RadarBadge] {
+        var result: [RadarBadge] = []
+
+        if flags.contains(.isNew) {
+            result.append(.new)
+        }
+        if isExclusive {
+            result.append(.exclusive)
+        }
+        if flags.contains(.isLimited) {
+            result.append(.limited)
+        }
+        return result
+    }
+
+    private static func containsSignedKeyword(in value: String?) -> Bool {
+        guard let value else { return false }
+        let normalized = value.lowercased().replacingOccurrences(of: "unsigned", with: "")
+        return signedKeywords.contains { normalized.contains($0) }
     }
 }

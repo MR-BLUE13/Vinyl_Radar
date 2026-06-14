@@ -18,6 +18,7 @@ class DedupeTests(unittest.TestCase):
             sourceItemKey="k1",
             storeID="store_blood_records",
             publishedAt=now - timedelta(minutes=10),
+            publishedAtSource="source",
             flags=["LIMITED"],
         )
         new = Release(
@@ -29,6 +30,7 @@ class DedupeTests(unittest.TestCase):
             sourceItemKey="k1",
             storeID="store_blood_records",
             publishedAt=now - timedelta(minutes=1),
+            publishedAtSource="source",
             flags=["LIMITED"],
         )
         cross_store = Release(
@@ -40,6 +42,7 @@ class DedupeTests(unittest.TestCase):
             sourceItemKey="k1",
             storeID="store_bad_world",
             publishedAt=now - timedelta(minutes=2),
+            publishedAtSource="source",
             flags=["LIMITED"],
         )
 

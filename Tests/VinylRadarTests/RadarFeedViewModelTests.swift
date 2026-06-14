@@ -33,7 +33,7 @@ struct RadarFeedViewModelTests {
         let viewModel = makeViewModel(savedIDs: [])
         await viewModel.load()
 
-        viewModel.applyStoreSelection(["s1", "s2"])
+        viewModel.applyStoreSelection(["s1", "s2"], stockFilter: .all)
 
         let loaded = loadedItems(from: viewModel.state)
         #expect(loaded?.count == 3)
@@ -46,7 +46,7 @@ struct RadarFeedViewModelTests {
         await viewModel.load()
 
         viewModel.selectedQuickFilter = .exclusive
-        viewModel.applyStoreSelection(["s2"])
+        viewModel.applyStoreSelection(["s2"], stockFilter: .all)
 
         let loaded = loadedItems(from: viewModel.state)
         #expect(loaded?.count == 1)
@@ -58,7 +58,7 @@ struct RadarFeedViewModelTests {
         let viewModel = makeViewModel(savedIDs: [])
         await viewModel.load()
 
-        viewModel.applyStoreSelection([])
+        viewModel.applyStoreSelection([], stockFilter: .all)
 
         let loaded = loadedItems(from: viewModel.state)
         #expect(loaded?.count == 4)
@@ -133,6 +133,79 @@ struct RadarFeedViewModelTests {
         #expect(loadedItems(from: viewModel.state)?.count == 2)
     }
 
+    @Test("load uses non-forced refresh")
+    func loadUsesNonForcedRefresh() async {
+        let reference = Date(timeIntervalSince1970: 1_700_000_000)
+        let releases = [
+            makeRelease(id: "r1", storeID: "s1", minutesAgo: 3, flags: [.isLimited], reference: reference),
+        ]
+        let repository = ForceRefreshProbeRepository(releases: releases)
+
+        let viewModel = RadarFeedViewModel(
+            repository: repository,
+            stores: [makeStore(id: "s1", name: "Store 1")],
+            wishlistStore: InMemoryWishlistStore(),
+            layoutStore: InMemoryFeedLayoutStore(layout: .large),
+            now: { reference },
+            loadDelayNanoseconds: 0
+        )
+
+        await viewModel.load()
+        #expect(await repository.receivedForceRefresh == [false])
+    }
+
+    @Test("retry can use forced refresh")
+    func retryUsesForcedRefresh() async {
+        let reference = Date(timeIntervalSince1970: 1_700_000_000)
+        let releases = [
+            makeRelease(id: "r1", storeID: "s1", minutesAgo: 3, flags: [.isLimited], reference: reference),
+        ]
+        let repository = ForceRefreshProbeRepository(releases: releases)
+
+        let viewModel = RadarFeedViewModel(
+            repository: repository,
+            stores: [makeStore(id: "s1", name: "Store 1")],
+            wishlistStore: InMemoryWishlistStore(),
+            layoutStore: InMemoryFeedLayoutStore(layout: .large),
+            now: { reference },
+            loadDelayNanoseconds: 0
+        )
+
+        await viewModel.load()
+        _ = await viewModel.retry(forceRefresh: true)
+
+        #expect(await repository.receivedForceRefresh == [false, true])
+    }
+
+    @Test("quick filter, stock filter, and store filter use AND logic")
+    func quickStockAndStoreFilter() async {
+        let reference = Date(timeIntervalSince1970: 1_700_000_000)
+        let releases = [
+            makeRelease(id: "r1", storeID: "s1", minutesAgo: 3, flags: [.isExclusive], isSoldOut: false, reference: reference),
+            makeRelease(id: "r2", storeID: "s1", minutesAgo: 4, flags: [.isExclusive], isSoldOut: true, reference: reference),
+            makeRelease(id: "r3", storeID: "s2", minutesAgo: 5, flags: [.isExclusive], isSoldOut: false, reference: reference),
+        ]
+
+        let viewModel = RadarFeedViewModel(
+            repository: MockRadarFeedRepository(mode: .custom(releases)),
+            stores: [
+                makeStore(id: "s1", name: "Store 1"),
+                makeStore(id: "s2", name: "Store 2"),
+            ],
+            wishlistStore: InMemoryWishlistStore(),
+            layoutStore: InMemoryFeedLayoutStore(layout: .large),
+            now: { reference },
+            loadDelayNanoseconds: 0
+        )
+
+        await viewModel.load()
+        viewModel.selectedQuickFilter = .exclusive
+        viewModel.applyStoreSelection(["s1"], stockFilter: .inStock)
+
+        let loaded = loadedItems(from: viewModel.state)
+        #expect(loaded?.map { $0.id } == ["r1"])
+    }
+
     private func makeViewModel(
         savedIDs: Set<String> = [],
         layoutStore: FeedLayoutStore = InMemoryFeedLayoutStore(layout: .large)
@@ -186,7 +259,7 @@ private actor SequenceRadarFeedRepository: RadarFeedRepository {
         self.batches = batches
     }
 
-    func fetchLatest() async throws -> [ReleaseDrop] {
+    func fetchLatest(forceRefresh: Bool) async throws -> [ReleaseDrop] {
         let current = min(index, batches.count - 1)
         let value = batches[current]
         if index < batches.count - 1 {
@@ -198,5 +271,19 @@ private actor SequenceRadarFeedRepository: RadarFeedRepository {
         case .failure(let error):
             throw error
         }
+    }
+}
+
+private actor ForceRefreshProbeRepository: RadarFeedRepository {
+    private let releases: [ReleaseDrop]
+    private(set) var receivedForceRefresh: [Bool] = []
+
+    init(releases: [ReleaseDrop]) {
+        self.releases = releases
+    }
+
+    func fetchLatest(forceRefresh: Bool) async throws -> [ReleaseDrop] {
+        receivedForceRefresh.append(forceRefresh)
+        return releases
     }
 }

@@ -25,18 +25,30 @@ public struct VinylRadarRootView: View {
         RadarFeedView(viewModel: viewModel)
     }
 
-    private static func makeDefaultRepository() -> any RadarFeedRepository {
-        guard let apiBaseURL = RadarRuntimeConfig.apiBaseURL else {
-            return MockRadarFeedRepository()
+    nonisolated static func makeDefaultRepository(
+        apiBaseURL: URL? = RadarRuntimeConfig.apiBaseURL,
+        cacheStore: any RadarFeedCacheStore = UserDefaultsRadarFeedCacheStore()
+    ) -> any RadarFeedRepository {
+        let emptyRepository = EmptyRadarFeedRepository()
+        let cachedRepository = FallbackRadarFeedRepository(
+            primary: CachedRadarFeedRepository(cacheStore: cacheStore),
+            fallback: emptyRepository
+        )
+
+        guard let apiBaseURL,
+              let remoteRepository = try? RemoteRadarFeedRepository(
+                baseURL: apiBaseURL,
+                cacheStore: cacheStore
+              ) else {
+            return cachedRepository
         }
 
-        guard let remoteRepository = try? RemoteRadarFeedRepository(baseURL: apiBaseURL) else {
-            return MockRadarFeedRepository()
-        }
-
-        return FallbackRadarFeedRepository(
-            primary: remoteRepository,
-            fallback: MockRadarFeedRepository()
+        return CachedFirstRadarFeedRepository(
+            remote: FallbackRadarFeedRepository(
+                primary: remoteRepository,
+                fallback: cachedRepository
+            ),
+            cacheStore: cacheStore
         )
     }
 }

@@ -1,8 +1,14 @@
 import SwiftUI
+#if canImport(UIKit)
+import UIKit
+#elseif canImport(AppKit)
+import AppKit
+#endif
 
 struct RadarCoverArtworkView: View {
     let imageURL: URL?
     let placeholderSeed: String
+    @State private var remoteImageData: Data?
 
     private var palette: [Color] {
         let gradients: [[Color]] = [
@@ -21,24 +27,18 @@ struct RadarCoverArtworkView: View {
 
     var body: some View {
         Group {
-            if let imageURL {
-                AsyncImage(url: imageURL) { phase in
-                    switch phase {
-                    case .success(let image):
-                        image
-                            .resizable()
-                            .scaledToFill()
-                    case .empty:
-                        placeholderLayer
-                    case .failure:
-                        placeholderLayer
-                    @unknown default:
-                        placeholderLayer
-                    }
-                }
+            if let renderedImage {
+                renderedImage
+                    .resizable()
+                    .scaledToFill()
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .clipped()
             } else {
                 placeholderLayer
             }
+        }
+        .task(id: imageURL) {
+            await loadRemoteImage()
         }
     }
 
@@ -63,5 +63,48 @@ struct RadarCoverArtworkView: View {
                 .fill(Color.white.opacity(0.45))
                 .frame(width: 8, height: 8)
         }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .clipped()
+    }
+
+    private var renderedImage: Image? {
+        guard let remoteImageData else {
+            return nil
+        }
+        return image(from: remoteImageData)
+    }
+
+    private func loadRemoteImage() async {
+        guard let imageURL else {
+            await MainActor.run {
+                remoteImageData = nil
+            }
+            return
+        }
+
+        await MainActor.run {
+            remoteImageData = nil
+        }
+
+        let requestedURL = imageURL
+        let data = await RadarArtworkLoader.shared.loadData(for: requestedURL)
+        await MainActor.run {
+            guard imageURL == requestedURL else {
+                return
+            }
+            remoteImageData = data
+        }
+    }
+
+    private func image(from data: Data) -> Image? {
+        #if canImport(UIKit)
+        guard let image = UIImage(data: data) else { return nil }
+        return Image(uiImage: image)
+        #elseif canImport(AppKit)
+        guard let image = NSImage(data: data) else { return nil }
+        return Image(nsImage: image)
+        #else
+        return nil
+        #endif
     }
 }

@@ -32,7 +32,7 @@ struct RadarEmptyStateView: View {
 
 #Preview {
     RadarEmptyStateView(
-        title: "暂无雷达命中",
+        title: "暂无相关内容",
         subtitle: "关注艺人或店铺后，这里会出现新的限量发售信息"
     )
     .padding()

@@ -7,6 +7,13 @@ public final class RadarFeedViewModel: ObservableObject {
     @Published public var selectedQuickFilter: RadarQuickFilter = .all {
         didSet {
             applyCurrentFilters()
+            refreshStoreFilterOptions()
+        }
+    }
+    @Published public var selectedStockFilter: StockAvailabilityFilter = .all {
+        didSet {
+            applyCurrentFilters()
+            refreshStoreFilterOptions()
         }
     }
     @Published public var selectedStoreIDs: Set<String> = [] {
@@ -32,6 +39,7 @@ public final class RadarFeedViewModel: ObservableObject {
     private var allItems: [RadarFeedItemViewData] = []
     private var lastUpdatedAt: Date?
     private var seenReleaseIDs: Set<String> = []
+    private var hasTriggeredSelfHealingRefresh = false
 
     public init(
         repository: any RadarFeedRepository,
@@ -60,15 +68,17 @@ public final class RadarFeedViewModel: ObservableObject {
         hasLoadedAtLeastOnce = true
         _ = await performLoad(
             countNewItems: false,
+            forceRefresh: false,
             showLoadingState: true,
             preserveStateOnFailure: false
         )
     }
 
     @discardableResult
-    public func retry() async -> RadarRefreshResult {
+    public func retry(forceRefresh: Bool = false) async -> RadarRefreshResult {
         await performLoad(
             countNewItems: true,
+            forceRefresh: forceRefresh,
             showLoadingState: false,
             preserveStateOnFailure: true
         )
@@ -89,6 +99,11 @@ public final class RadarFeedViewModel: ObservableObject {
     }
 
     public func applyStoreSelection(_ storeIDs: Set<String>) {
+        applyStoreSelection(storeIDs, stockFilter: selectedStockFilter)
+    }
+
+    public func applyStoreSelection(_ storeIDs: Set<String>, stockFilter: StockAvailabilityFilter) {
+        selectedStockFilter = stockFilter
         selectedStoreIDs = storeIDs
         dismissStoreFilterSheet()
     }
@@ -109,7 +124,13 @@ public final class RadarFeedViewModel: ObservableObject {
                 publishedAtText: item.publishedAtText,
                 publishedAt: item.publishedAt,
                 badges: item.badges,
-                isSaved: wishlistStore.isSaved(id: id)
+                publishedAtSource: item.publishedAtSource,
+                isExclusive: item.isExclusive,
+                isSigned: item.isSigned,
+                isSignedDerived: item.isSignedDerived,
+                isSaved: wishlistStore.isSaved(id: id),
+                description: item.description,
+                isSoldOut: item.isSoldOut
             )
         }
 
@@ -118,6 +139,7 @@ public final class RadarFeedViewModel: ObservableObject {
 
     private func performLoad(
         countNewItems: Bool,
+        forceRefresh: Bool,
         showLoadingState: Bool,
         preserveStateOnFailure: Bool
     ) async -> RadarRefreshResult {
@@ -132,7 +154,7 @@ public final class RadarFeedViewModel: ObservableObject {
                 try await Task.sleep(nanoseconds: loadDelayNanoseconds)
             }
 
-            let releases = try await repository.fetchLatest()
+            let releases = try await repository.fetchLatest(forceRefresh: forceRefresh)
             let currentIDs = Set(releases.map(\.id))
             let newCount = countNewItems ? currentIDs.subtracting(seenReleaseIDs).count : 0
 
@@ -142,6 +164,20 @@ public final class RadarFeedViewModel: ObservableObject {
 
             rebuildAllItems()
             applyCurrentFilters()
+            logDiagnostics()
+
+            if !forceRefresh && shouldTriggerSelfHealingRefresh() {
+                hasTriggeredSelfHealingRefresh = true
+                Task { [weak self] in
+                    guard let self else { return }
+                    _ = await self.performLoad(
+                        countNewItems: false,
+                        forceRefresh: true,
+                        showLoadingState: false,
+                        preserveStateOnFailure: true
+                    )
+                }
+            }
 
             return RadarRefreshResult(didSucceed: true, newFeedCount: newCount)
         } catch is CancellationError {
@@ -192,7 +228,9 @@ public final class RadarFeedViewModel: ObservableObject {
         storeFilterOptions = mapper.storeFilterOptions(
             from: allItems,
             stores: stores,
-            selectedStoreIDs: selectedStoreIDs
+            selectedStoreIDs: selectedStoreIDs,
+            quickFilter: selectedQuickFilter,
+            stockFilter: selectedStockFilter
         )
     }
 
@@ -201,6 +239,7 @@ public final class RadarFeedViewModel: ObservableObject {
 
         let filtered = mapper.apply(
             quickFilter: selectedQuickFilter,
+            stockFilter: selectedStockFilter,
             selectedStoreIDs: selectedStoreIDs,
             to: allItems
         )
@@ -210,6 +249,34 @@ public final class RadarFeedViewModel: ObservableObject {
         } else {
             state = .loaded(filtered)
         }
+    }
+
+    private func shouldTriggerSelfHealingRefresh() -> Bool {
+        guard !hasTriggeredSelfHealingRefresh else { return false }
+        guard !allItems.isEmpty else { return false }
+
+        let unknownCount = allItems.filter { $0.publishedAtSource == .unknown }.count
+        let signedFlagCount = allReleases.filter { $0.flags.contains(.isSigned) }.count
+        let signedDerivedCount = allItems.filter { $0.isSignedDerived }.count
+
+        let unknownDominates = unknownCount * 2 >= allItems.count
+        let signedLooksStale = signedFlagCount == 0 && signedDerivedCount > 0
+
+        return unknownDominates || signedLooksStale
+    }
+
+    private func logDiagnostics() {
+        #if DEBUG
+            let signedFlagCount = allReleases.filter { $0.flags.contains(.isSigned) }.count
+            let signedDerivedCount = allItems.filter(\.isSignedDerived).count
+            let sourceCount = allItems.filter { $0.publishedAtSource == .source }.count
+            let firstSeenCount = allItems.filter { $0.publishedAtSource == .firstSeen }.count
+            let unknownCount = allItems.filter { $0.publishedAtSource == .unknown }.count
+            debugPrint(
+                "Radar diagnostics signedFlagCount=\(signedFlagCount) signedDerivedCount=\(signedDerivedCount) " +
+                    "publishedAtSource[source=\(sourceCount),firstSeen=\(firstSeenCount),unknown=\(unknownCount)]"
+            )
+        #endif
     }
 }
 

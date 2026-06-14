@@ -18,7 +18,7 @@ public actor MockRadarFeedRepository: RadarFeedRepository {
         self.mode = mode
     }
 
-    public func fetchLatest() async throws -> [ReleaseDrop] {
+    public func fetchLatest(forceRefresh: Bool = false) async throws -> [ReleaseDrop] {
         switch mode {
         case .resources:
             return try MockDataLoader.loadReleases()

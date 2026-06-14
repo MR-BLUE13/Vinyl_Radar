@@ -16,11 +16,5 @@
     "name": "Banquet Records",
     "region": "UK",
     "isFollowed": true
-  },
-  {
-    "id": "store_rough_trade_us",
-    "name": "Rough Trade US",
-    "region": "US",
-    "isFollowed": false
   }
 ]

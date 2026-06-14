@@ -13,14 +13,25 @@ struct ReleaseRadarCard: View {
         max(0, item.badges.count - visibleBadges.count)
     }
 
+    private var metaText: String {
+        if item.isSoldOut {
+            return "\(item.sourceName) · 已售罄"
+        }
+        return item.sourceName
+    }
+
     var body: some View {
         ZStack(alignment: .topTrailing) {
             Button(action: onTap) {
                 ZStack {
-                    RadarCoverArtworkView(
-                        imageURL: item.coverImageURL,
-                        placeholderSeed: item.coverAssetName ?? item.id
-                    )
+                    GeometryReader { proxy in
+                        RadarCoverArtworkView(
+                            imageURL: item.coverImageURL,
+                            placeholderSeed: item.coverAssetName ?? item.id
+                        )
+                        .frame(width: proxy.size.width, height: proxy.size.height)
+                        .clipped()
+                    }
 
                     RoundedRectangle(cornerRadius: RadarRadius.card, style: .continuous)
                         .fill(
@@ -72,7 +83,7 @@ struct ReleaseRadarCard: View {
                                 .lineLimit(2)
                                 .shadow(color: Color.black.opacity(0.4), radius: 3, x: 0, y: 1)
 
-                            Text("\(item.sourceName) · \(item.publishedAtText)")
+                            Text(metaText)
                                 .font(RadarTypography.meta)
                                 .foregroundStyle(Color.white.opacity(0.82))
                                 .lineLimit(1)
@@ -80,7 +91,6 @@ struct ReleaseRadarCard: View {
                     }
                     .padding(RadarSpacing.md)
                 }
-                .frame(maxWidth: .infinity)
                 .aspectRatio(0.78, contentMode: .fit)
                 .clipShape(RoundedRectangle(cornerRadius: RadarRadius.card, style: .continuous))
                 .overlay(
@@ -88,6 +98,7 @@ struct ReleaseRadarCard: View {
                         .stroke(Color.white.opacity(0.08), lineWidth: 1)
                 )
                 .shadow(color: Color.black.opacity(0.2), radius: 10, x: 0, y: 8)
+                .clipped()
             }
             .buttonStyle(.plain)
             .accessibilityIdentifier("release_card_\(item.id)")

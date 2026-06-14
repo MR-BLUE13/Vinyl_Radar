@@ -4,7 +4,7 @@ import json
 import threading
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Dict, List, Optional
+from typing import Any, Dict, List, Optional
 
 from .models import Release, parse_iso8601, to_iso8601
 
@@ -28,16 +28,34 @@ class JsonStore:
                 return None
             return json.loads(self._snapshot_path.read_text(encoding="utf-8"))
 
-    def save_snapshot(self, generated_at: str, releases: List[Release]) -> None:
+    def save_snapshot(
+        self,
+        generated_at: str,
+        releases: List[Release],
+        refresh_meta: Optional[Dict[str, Any]] = None,
+    ) -> None:
         payload = {
             "generatedAt": generated_at,
             "releases": [release.to_dict() for release in releases],
         }
+        if refresh_meta is not None:
+            payload["refreshMeta"] = refresh_meta
         with self._lock:
             self._snapshot_path.write_text(
                 json.dumps(payload, ensure_ascii=False, indent=2),
                 encoding="utf-8",
             )
+
+    def load_refresh_meta(self) -> Dict[str, Any]:
+        snapshot = self.load_snapshot()
+        if not snapshot:
+            return {
+                "generatedAt": None,
+                "perSource": {},
+                "failedSources": {},
+                "warnings": [],
+            }
+        return dict(snapshot.get("refreshMeta", {}))
 
     def load_state(self) -> FeedState:
         with self._lock:

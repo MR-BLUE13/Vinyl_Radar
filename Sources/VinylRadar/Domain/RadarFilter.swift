@@ -2,9 +2,8 @@ import Foundation
 
 public enum RadarQuickFilter: String, CaseIterable, Identifiable, Sendable {
     case all
-    case limited
-    case colored
     case exclusive
+    case signed
     case saved
 
     public var id: String { rawValue }
@@ -13,12 +12,10 @@ public enum RadarQuickFilter: String, CaseIterable, Identifiable, Sendable {
         switch self {
         case .all:
             return "全部"
-        case .limited:
-            return "限量"
-        case .colored:
-            return "彩胶"
         case .exclusive:
             return "独家"
+        case .signed:
+            return "带签名"
         case .saved:
             return "已收藏"
         }

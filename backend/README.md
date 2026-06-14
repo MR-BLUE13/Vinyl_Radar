@@ -2,6 +2,7 @@
 
 纯 Python 标准库实现的聚合服务，提供：
 - `GET /v1/radar/releases`
+- `GET /v1/radar/refresh-status`
 - `POST /admin/refresh`
 - `GET /health`
 
@@ -40,6 +41,20 @@ python3 -m backend.app --once
 App 会请求：
 
 - `GET /v1/radar/releases`
+
+返回 `releases[]` 关键字段：
+- `id, artist, title, storeID, publishedAt, flags`
+- `coverImageURL`（可空）
+- `sourceItemURL`（可空）
+- `sourceItemKey`
+- `description`（可空，短描述）
+- `isSoldOut`（是否已售罄）
+
+顶层附带 `refreshMeta`：
+- `generatedAt`
+- `perSource`
+- `failedSources`
+- `warnings`
 
 ## 数据持久化
 运行时文件写入：

@@ -8,6 +8,7 @@ struct RadarQuickFilterBar: View {
         HStack(spacing: RadarSpacing.xs) {
             RadarQuickFilterChipsView(selectedFilter: $selectedFilter)
                 .frame(maxWidth: .infinity, alignment: .leading)
+                .clipped()
 
             Button(action: onStoreFilterTap) {
                 Image(systemName: "line.3.horizontal.decrease.circle")
@@ -20,6 +21,7 @@ struct RadarQuickFilterBar: View {
             .accessibilityIdentifier("store_filter_button")
             .accessibilityLabel("筛选店铺")
         }
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
 }
 

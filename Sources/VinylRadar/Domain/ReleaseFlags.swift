@@ -7,6 +7,7 @@ public struct ReleaseFlags: OptionSet, Codable, Hashable, Sendable {
     public static let isLimited = ReleaseFlags(rawValue: 1 << 1)
     public static let isColored = ReleaseFlags(rawValue: 1 << 2)
     public static let isExclusive = ReleaseFlags(rawValue: 1 << 3)
+    public static let isSigned = ReleaseFlags(rawValue: 1 << 4)
 
     public static let none: ReleaseFlags = []
 
@@ -24,9 +25,6 @@ public struct ReleaseFlags: OptionSet, Codable, Hashable, Sendable {
         }
         if contains(.isLimited) {
             result.append(.limited)
-        }
-        if contains(.isColored) {
-            result.append(.colored)
         }
         return result
     }
@@ -67,6 +65,8 @@ public struct ReleaseFlags: OptionSet, Codable, Hashable, Sendable {
                 flags.insert(.isColored)
             case RadarBadge.exclusive.rawValue:
                 flags.insert(.isExclusive)
+            case "SIGNED":
+                flags.insert(.isSigned)
             default:
                 continue
             }
@@ -77,6 +77,26 @@ public struct ReleaseFlags: OptionSet, Codable, Hashable, Sendable {
 
     public func encode(to encoder: Encoder) throws {
         var container = encoder.singleValueContainer()
-        try container.encode(badges.map(\.rawValue))
+        try container.encode(apiValues)
+    }
+
+    private var apiValues: [String] {
+        var values: [String] = []
+        if contains(.isNew) {
+            values.append(RadarBadge.new.rawValue)
+        }
+        if contains(.isExclusive) {
+            values.append(RadarBadge.exclusive.rawValue)
+        }
+        if contains(.isLimited) {
+            values.append(RadarBadge.limited.rawValue)
+        }
+        if contains(.isColored) {
+            values.append(RadarBadge.colored.rawValue)
+        }
+        if contains(.isSigned) {
+            values.append("SIGNED")
+        }
+        return values
     }
 }

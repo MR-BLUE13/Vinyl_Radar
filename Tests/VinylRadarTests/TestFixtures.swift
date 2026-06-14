@@ -17,6 +17,10 @@ func makeRelease(
     storeID: String = "s1",
     minutesAgo: Int,
     flags: ReleaseFlags = [],
+    description: String? = nil,
+    isSoldOut: Bool = false,
+    publishedAtSource: PublishedAtSource = .source,
+    signedByHeuristic: Bool = false,
     reference: Date = Date(timeIntervalSince1970: 1_700_000_000)
 ) -> ReleaseDrop {
     ReleaseDrop(
@@ -26,6 +30,10 @@ func makeRelease(
         coverAssetName: "cover_01",
         storeID: storeID,
         publishedAt: reference.addingTimeInterval(TimeInterval(-minutesAgo * 60)),
-        flags: flags
+        publishedAtSource: publishedAtSource,
+        flags: flags,
+        description: description,
+        isSoldOut: isSoldOut,
+        signedByHeuristic: signedByHeuristic
     )
 }

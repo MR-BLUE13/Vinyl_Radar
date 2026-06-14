@@ -45,10 +45,11 @@ class RefreshScheduler(threading.Thread):
             try:
                 metrics = self._aggregator.refresh()
                 logger.info(
-                    "refresh complete total=%d per_source=%s failed_sources=%s",
+                    "refresh complete total=%d per_source=%s failed_sources=%s warnings=%s",
                     metrics.total,
                     metrics.per_source,
                     metrics.failed_sources,
+                    metrics.warnings,
                 )
             except Exception as exc:  # noqa: BLE001
                 logger.exception("refresh loop failed: %s", exc)
@@ -87,6 +88,11 @@ class RadarHandler(BaseHTTPRequestHandler):
             self._write_json(HTTPStatus.OK, snapshot)
             return
 
+        if parsed.path == "/v1/radar/refresh-status":
+            status = self.aggregator.get_refresh_status()
+            self._write_json(HTTPStatus.OK, status)
+            return
+
         self._write_json(HTTPStatus.NOT_FOUND, {"error": "Not Found"})
 
     def do_POST(self) -> None:  # noqa: N802
@@ -100,6 +106,7 @@ class RadarHandler(BaseHTTPRequestHandler):
                     "total": metrics.total,
                     "perSource": metrics.per_source,
                     "failedSources": metrics.failed_sources,
+                    "warnings": metrics.warnings,
                 },
             )
             return
@@ -146,16 +153,25 @@ def main() -> None:
     host = os.getenv("RADAR_BACKEND_HOST", "127.0.0.1")
     port = env_int("RADAR_BACKEND_PORT", 8080)
     data_dir = Path(__file__).resolve().parent / "data"
+    route_table = ["/health", "/v1/radar/releases", "/v1/radar/refresh-status", "/admin/refresh"]
+
+    logger.info(
+        "runtime self-check module=%s cwd=%s routes=%s",
+        Path(__file__).resolve(),
+        Path.cwd(),
+        route_table,
+    )
 
     if args.once:
         store = JsonStore(data_dir)
         aggregator = FeedAggregator(store=store)
         metrics = aggregator.refresh()
         logger.info(
-            "one-shot refresh complete total=%d per_source=%s failed_sources=%s",
+            "one-shot refresh complete total=%d per_source=%s failed_sources=%s warnings=%s",
             metrics.total,
             metrics.per_source,
             metrics.failed_sources,
+            metrics.warnings,
         )
         return
 

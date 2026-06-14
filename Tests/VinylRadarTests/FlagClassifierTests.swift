@@ -36,4 +36,19 @@ struct FlagClassifierTests {
         #expect(flags.contains(.isLimited))
         #expect(!flags.contains(.isNew))
     }
+
+    @Test("classifies signed keywords")
+    func signedKeywords() {
+        let now = Date(timeIntervalSince1970: 1_700_000_000)
+        let firstSeen = now.addingTimeInterval(-2 * 60 * 60)
+
+        let flags = FeedFlagClassifier.classify(
+            title: "Personally Signed Edition",
+            subtitle: "Includes hand-signed print",
+            firstSeenAt: firstSeen,
+            now: now
+        )
+
+        #expect(flags.contains(.isSigned))
+    }
 }

@@ -2,57 +2,54 @@ from __future__ import annotations
 
 from datetime import datetime
 from typing import List
-from urllib.request import Request, urlopen
 
-from .base import SourceAdapter
-from .html_utils import extract_candidate_entries
+from .shopify_base import ShopifyCollectionAdapter
+from .html_utils import (
+    extract_product_metadata,
+    extract_shopify_product_entries,
+    fetch_html,
+    resolve_artist_and_title,
+)
 from ..models import RawRelease
 
 
-class BadWorldAdapter(SourceAdapter):
+class BadWorldAdapter(ShopifyCollectionAdapter):
     source = "bad_world"
     store_id = "store_bad_world"
-    entry_url = "https://bad-world.co.uk/"
+    entry_url = "https://bad-world.co.uk/collections/frontpage"
+    products_json_urls = [
+        "https://bad-world.co.uk/collections/frontpage/products.json?limit=250",
+        "https://bad-world.co.uk/collections/all/products.json?limit=250",
+        "https://bad-world.co.uk/products.json?limit=250",
+    ]
 
-    def fetch_latest(self, now: datetime) -> List[RawRelease]:
-        html_text = _fetch_html(self.entry_url)
-        entries = extract_candidate_entries(self.entry_url, html_text)
+    def fetch_from_html_fallback(self, now: datetime) -> List[RawRelease]:
+        html_text = fetch_html(self.entry_url, timeout=4)
+        entries = extract_shopify_product_entries(self.entry_url, html_text, limit=30)
         releases: List[RawRelease] = []
-        for href, text, image_url in entries:
+        for href, text in entries:
+            metadata = _safe_fetch_metadata(href)
+            artist, title = resolve_artist_and_title(text, metadata)
             releases.append(
                 RawRelease(
                     source=self.source,
                     store_id=self.store_id,
                     source_item_key=href,
-                    artist=_guess_artist(text),
-                    title=_guess_title(text),
+                    artist=artist,
+                    title=title,
                     source_item_url=href,
-                    cover_image_url=image_url,
-                    published_at=now,
+                    cover_image_url=metadata.cover_image_url if metadata else None,
+                    description=metadata.description if metadata else None,
+                    is_sold_out=False,
+                    published_at=metadata.published_at if metadata else None,
                 )
             )
         return releases
 
 
-def _fetch_html(url: str) -> str:
-    request = Request(
-        url,
-        headers={
-            "User-Agent": "VinylRadarBot/1.0 (+https://example.local)",
-            "Accept": "text/html,application/xhtml+xml",
-        },
-    )
-    with urlopen(request, timeout=8) as response:
-        return response.read().decode("utf-8", errors="ignore")
-
-
-def _guess_artist(text: str) -> str:
-    if " - " in text:
-        return text.split(" - ", 1)[0].strip()
-    return "Unknown Artist"
-
-
-def _guess_title(text: str) -> str:
-    if " - " in text:
-        return text.split(" - ", 1)[1].strip()
-    return text.strip()
+def _safe_fetch_metadata(url: str):
+    try:
+        product_html = fetch_html(url, timeout=4)
+    except Exception:  # noqa: BLE001
+        return None
+    return extract_product_metadata(url, product_html)
